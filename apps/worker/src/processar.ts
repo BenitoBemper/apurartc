@@ -1,8 +1,11 @@
-// Processa uma mensagem da fila "importacoes": valida → calcula → grava (uma transação) → atualiza uso.
+// Processa uma mensagem da fila "importacoes": lê → valida → calcula → grava (uma transação) → atualiza uso.
+// JSON: o arquivo é uma unidade (layout inválido = importação com erro).
+// XML/ZIP: cada nota é independente (notas com erro são registradas e as demais seguem).
 import type { Pool, PoolClient } from "pg";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { validarArquivo, paraCalculadora, type Operacao } from "./layout.js";
-import { calcular, lerObjeto, ErroCalculadora, type RespostaRoc } from "./calculadora.js";
+import { calcular, lerObjeto, validarXmlOficial, ErroCalculadora, type RespostaRoc } from "./calculadora.js";
+import { lerXml, lerZip, type PapelNota, type ResultadoLeitura } from "./xml.js";
 
 export const FILA = "importacoes";
 export const BUCKET = "arquivos";
@@ -17,10 +20,16 @@ type Importacao = {
   id: string;
   escritorio_id: string;
   empresa_id: string;
+  empresa_cnpj: string;
   arquivo_path: string;
   formato: string;
   status: string;
 };
+
+/** Uma nota a calcular. */
+type Entrada = { operacao: Operacao; papel: PapelNota; arquivo: string | null };
+/** Erro/aviso sem documento gravado (layout, XSD, nota de outra empresa, rejeição da calculadora…). */
+type Ocorrencia = { codigo: string; campo: string; mensagem: string; arquivo: string | null };
 
 class FalhaDefinitiva extends Error {}
 
@@ -54,7 +63,8 @@ export async function processarMensagem(m: Mensagem, deps: Deps): Promise<"concl
 
   const { rows } = id
     ? await pool.query<Importacao>(
-        "select id, escritorio_id, empresa_id, arquivo_path, formato, status from public.importacoes where id = $1",
+        `select i.id, i.escritorio_id, i.empresa_id, e.cnpj as empresa_cnpj, i.arquivo_path, i.formato::text, i.status::text
+         from public.importacoes i join public.empresas e on e.id = i.empresa_id where i.id = $1`,
         [id],
       )
     : { rows: [] as Importacao[] };
@@ -68,46 +78,96 @@ export async function processarMensagem(m: Mensagem, deps: Deps): Promise<"concl
 
   try {
     await status("validando");
-    if (imp.formato !== "json") throw new FalhaDefinitiva(`formato ${imp.formato} ainda não é suportado (MVP: JSON)`);
-
     const { data: blob, error } = await deps.storage.storage.from(BUCKET).download(imp.arquivo_path);
     if (error || !blob) throw new Error(`não foi possível baixar o arquivo: ${error?.message ?? "vazio"}`);
 
-    const v = validarArquivo(await blob.text());
-    if (!v.ok) {
-      await registrarErroLayout(pool, imp, v.erros);
+    const ocorrencias: Ocorrencia[] = [];
+    let entradas: Entrada[];
+
+    if (imp.formato === "json") {
+      const v = validarArquivo(await blob.text());
+      if (!v.ok) {
+        await finalizarComErro(pool, imp, v.erros.map((e) => ({ codigo: "LAYOUT", ...e, arquivo: null })),
+          "Layout inválido: veja os erros de validação");
+        await arquivar();
+        log(`[${imp.id}] layout inválido (${v.erros.length} erros)`);
+        return "erro";
+      }
+      entradas = v.operacoes.map((operacao) => ({ operacao, papel: "emitida" as const, arquivo: null }));
+    } else if (imp.formato === "xml_nfe" || imp.formato === "zip") {
+      const nome = imp.arquivo_path.split("/").pop()!.replace(/^[0-9a-f-]{36}__/, "");
+      const leitura: ResultadoLeitura = imp.formato === "zip"
+        ? lerZip(new Uint8Array(await blob.arrayBuffer()), imp.empresa_cnpj)
+        : lerXml(nome, await blob.text(), imp.empresa_cnpj);
+      ocorrencias.push(
+        ...leitura.erros.map((e) => ({ codigo: "XML", campo: e.campo, mensagem: e.mensagem, arquivo: e.arquivo })),
+        ...leitura.avisos.map((a) => ({ codigo: "AVISO", campo: "#", mensagem: a.mensagem, arquivo: a.arquivo })),
+      );
+      // Validador XSD oficial da calculadora, nota a nota
+      const validas = await emLotes(leitura.notas, CONCORRENCIA, async (n) => {
+        const r = await validarXmlOficial(deps.calculadoraUrl, n.modelo === "55" ? "nfe" : "nfce", n.xmlNFe);
+        if (!r.ok) ocorrencias.push({ codigo: "XSD", campo: "#", mensagem: `nota ${n.chave}: ${r.mensagem}`, arquivo: n.arquivo });
+        return r.ok;
+      });
+      entradas = leitura.notas
+        .filter((_, i) => validas[i])
+        .map((n) => ({ operacao: n.operacao, papel: n.papel, arquivo: n.arquivo }));
+    } else {
+      throw new FalhaDefinitiva(`formato ${imp.formato} não suportado`);
+    }
+
+    // Notas já importadas antes (mesma chave, empresa e papel) não entram de novo
+    entradas = await removerDuplicadas(pool, imp, entradas, ocorrencias);
+
+    if (entradas.length === 0) {
+      const so = ocorrencias.length && ocorrencias.every((o) => o.codigo === "AVISO");
+      await finalizarComErro(pool, imp, ocorrencias, so ? "Nenhuma nota nova para calcular" : "Nenhuma nota válida: veja os erros");
       await arquivar();
-      log(`[${imp.id}] layout inválido (${v.erros.length} erros)`);
+      log(`[${imp.id}] sem notas válidas`);
       return "erro";
     }
 
-    await verificarLimite(pool, imp.escritorio_id, v.operacoes);
+    await verificarLimite(pool, imp.escritorio_id, entradas);
     await status("processando");
 
-    const rocs = await emLotes(v.operacoes, CONCORRENCIA, async (op, o) => {
+    // JSON: rejeição da calculadora derruba o arquivo; XML/ZIP: só a nota
+    const parcial = imp.formato !== "json";
+    const rocs = await emLotes(entradas, CONCORRENCIA, async (e, o): Promise<RespostaRoc | null> => {
       try {
-        return await calcular(deps.calculadoraUrl, paraCalculadora(op));
-      } catch (e) {
-        // Aponta a operação do arquivo (lista) nos erros devolvidos pela calculadora
-        if (e instanceof ErroCalculadora && v.operacoes.length > 1) {
-          e.erros = e.erros.map((x) => ({ ...x, campo: `#/${o}${x.campo.replace(/^#/, "")}` }));
+        return await calcular(deps.calculadoraUrl, paraCalculadora(e.operacao));
+      } catch (err) {
+        if (err instanceof ErroCalculadora && !err.transitorio && parcial) {
+          const chave = e.operacao.chaveAcesso ?? e.operacao.id;
+          const lista = err.erros.length ? err.erros : [{ codigo: "CALC", campo: "#", mensagem: err.message }];
+          ocorrencias.push(...lista.map((x) => ({ ...x, mensagem: `nota ${chave}: ${x.mensagem}`, arquivo: e.arquivo })));
+          return null;
         }
-        throw e;
+        if (err instanceof ErroCalculadora && entradas.length > 1) {
+          err.erros = err.erros.map((x) => ({ ...x, campo: `#/${o}${x.campo.replace(/^#/, "")}` }));
+        }
+        throw err;
       }
     });
+
+    const calculadas = entradas.map((e, i) => ({ ...e, roc: rocs[i] })).filter((e): e is Entrada & { roc: RespostaRoc } => !!e.roc);
+    if (calculadas.length === 0) {
+      await finalizarComErro(pool, imp, ocorrencias, "A calculadora rejeitou todas as notas: veja os erros");
+      await arquivar();
+      return "erro";
+    }
 
     const rocPath = `${imp.escritorio_id}/${imp.empresa_id}/roc/${imp.id}.json`;
     const up = await deps.storage.storage
       .from(BUCKET)
-      .upload(rocPath, JSON.stringify(rocs), { contentType: "application/json", upsert: true });
+      .upload(rocPath, JSON.stringify(calculadas.map((c) => c.roc)), { contentType: "application/json", upsert: true });
     if (up.error) throw new Error(`falha ao gravar o ROC: ${up.error.message}`);
 
     const cliente = await pool.connect();
     try {
       await cliente.query("begin");
-      const r = await gravar(cliente, imp, v.operacoes, rocs, rocPath);
+      const r = await gravar(cliente, imp, calculadas, ocorrencias, rocPath);
       await cliente.query("commit");
-      log(`[${imp.id}] concluída: ${r.docs} documentos, ${r.itens} itens, ${r.erros} com erro`);
+      log(`[${imp.id}] concluída: ${r.docs} notas, ${r.itens} itens, ${r.erros} itens com erro, ${ocorrencias.length} ocorrências`);
     } catch (e) {
       await cliente.query("rollback");
       throw e;
@@ -118,7 +178,7 @@ export async function processarMensagem(m: Mensagem, deps: Deps): Promise<"concl
     return "concluido";
   } catch (e) {
     if (e instanceof ErroCalculadora && !e.transitorio && e.erros.length) {
-      await registrarErroLayout(pool, imp, e.erros, e.message);
+      await finalizarComErro(pool, imp, e.erros.map((x) => ({ ...x, arquivo: null })), e.message);
       await arquivar();
       log(`[${imp.id}] rejeitada pela calculadora (${e.erros.length} erros)`);
       return "erro";
@@ -140,28 +200,53 @@ export async function processarMensagem(m: Mensagem, deps: Deps): Promise<"concl
   }
 }
 
-async function registrarErroLayout(
-  pool: Pool,
-  imp: Importacao,
-  erros: { campo: string; mensagem: string; codigo?: string }[],
-  mensagem = "Layout inválido: veja os erros de validação",
-) {
-  await pool.query(
-    `insert into public.erros_validacao (escritorio_id, empresa_id, importacao_id, codigo, campo, mensagem)
-     select $1, $2, $3, coalesce(x.codigo, 'LAYOUT'), x.campo, x.mensagem
-     from jsonb_to_recordset($4::jsonb) as x(codigo text, campo text, mensagem text)`,
-    [imp.escritorio_id, imp.empresa_id, imp.id, JSON.stringify(erros)],
-  );
-  await pool.query(
-    `update public.importacoes set status = 'erro', qtd_erros = $2, concluido_em = now(), mensagem_erro = $3 where id = $1`,
-    [imp.id, erros.length, mensagem.slice(0, 1000)],
+async function inserirOcorrencias(c: Pool | PoolClient, imp: Importacao, lista: Ocorrencia[]) {
+  if (!lista.length) return;
+  await c.query(
+    `insert into public.erros_validacao (escritorio_id, empresa_id, importacao_id, codigo, campo, mensagem, arquivo_origem)
+     select $1, $2, $3, x.codigo, x.campo, x.mensagem, x.arquivo
+     from jsonb_to_recordset($4::jsonb) as x(codigo text, campo text, mensagem text, arquivo text)`,
+    [imp.escritorio_id, imp.empresa_id, imp.id, JSON.stringify(lista)],
   );
 }
 
-async function verificarLimite(pool: Pool, escritorioId: string, ops: Operacao[]) {
+const contaComoErro = (lista: Ocorrencia[]) => lista.filter((o) => o.codigo !== "AVISO").length;
+
+async function finalizarComErro(pool: Pool, imp: Importacao, lista: Ocorrencia[], mensagem: string) {
+  await inserirOcorrencias(pool, imp, lista);
+  await pool.query(
+    `update public.importacoes set status = 'erro', qtd_erros = $2, concluido_em = now(), mensagem_erro = $3 where id = $1`,
+    [imp.id, contaComoErro(lista), mensagem.slice(0, 1000)],
+  );
+}
+
+async function removerDuplicadas(pool: Pool, imp: Importacao, entradas: Entrada[], ocorrencias: Ocorrencia[]) {
+  const vistas = new Set<string>();
+  const comChave = entradas.filter((e) => e.operacao.chaveAcesso).map((e) => e.operacao.chaveAcesso!);
+  const { rows } = comChave.length
+    ? await pool.query<{ chave_acesso: string; papel: string }>(
+        "select chave_acesso, papel::text from public.documentos where empresa_id = $1 and chave_acesso = any($2::text[])",
+        [imp.empresa_id, comChave],
+      )
+    : { rows: [] };
+  const existentes = new Set(rows.map((r) => `${r.chave_acesso}|${r.papel}`));
+  return entradas.filter((e) => {
+    const ch = e.operacao.chaveAcesso;
+    if (!ch) return true;
+    const k = `${ch}|${e.papel}`;
+    if (existentes.has(k) || vistas.has(k)) {
+      ocorrencias.push({ codigo: "AVISO", campo: "#/chaveAcesso", mensagem: `nota ${ch} já importada: ignorada`, arquivo: e.arquivo });
+      return false;
+    }
+    vistas.add(k);
+    return true;
+  });
+}
+
+async function verificarLimite(pool: Pool, escritorioId: string, entradas: Entrada[]) {
   const porMes = new Map<string, number>();
-  for (const op of ops) {
-    const c = competenciaDe(op.dhFatoGerador);
+  for (const e of entradas) {
+    const c = competenciaDe(e.operacao.dhFatoGerador);
     porMes.set(c, (porMes.get(c) ?? 0) + 1);
   }
   for (const [comp, novas] of porMes) {
@@ -178,20 +263,26 @@ async function verificarLimite(pool: Pool, escritorioId: string, ops: Operacao[]
   }
 }
 
-async function gravar(c: PoolClient, imp: Importacao, ops: Operacao[], rocs: RespostaRoc[], rocPath: string) {
+async function gravar(
+  c: PoolClient,
+  imp: Importacao,
+  notas: (Entrada & { roc: RespostaRoc })[],
+  ocorrencias: Ocorrencia[],
+  rocPath: string,
+) {
   let itensTotal = 0;
   let itensErro = 0;
   const competencias = new Map<string, number>();
 
-  for (let o = 0; o < ops.length; o++) {
-    const op = ops[o];
+  for (let o = 0; o < notas.length; o++) {
+    const { operacao: op, papel, arquivo, roc } = notas[o];
     const doc = await c.query<{ id: string; competencia: string }>(
       `insert into public.documentos (escritorio_id, empresa_id, importacao_id, tipo_dfe, chave_acesso, numero, serie,
-         dh_emissao, dh_fato_gerador, uf, municipio)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10)
+         dh_emissao, dh_fato_gerador, uf, municipio, papel, arquivo_origem)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12)
        returning id, to_char(competencia, 'YYYY-MM-DD') as competencia`,
       [imp.escritorio_id, imp.empresa_id, imp.id, op.tipoDfe ?? "OPERACAO", op.chaveAcesso ?? null,
-       op.numero ?? op.id ?? null, op.serie ?? null, op.dhFatoGerador, op.uf, op.municipio],
+       op.numero ?? op.id ?? null, op.serie ?? null, op.dhFatoGerador, op.uf, op.municipio, papel, arquivo],
     );
     const { id: docId, competencia } = doc.rows[0];
     competencias.set(competencia, (competencias.get(competencia) ?? 0) + 1);
@@ -218,7 +309,7 @@ async function gravar(c: PoolClient, imp: Importacao, ops: Operacao[], rocs: Res
     // objetos[i] corresponde a itens[i] (mesma ordem do envio)
     const resultados: Record<string, unknown>[] = [];
     const erros: Record<string, unknown>[] = [];
-    rocs[o].objetos.forEach((obj, i) => {
+    roc.objetos.forEach((obj, i) => {
       const item = op.itens[i];
       if (!item) return;
       const r = lerObjeto(obj);
@@ -247,18 +338,20 @@ async function gravar(c: PoolClient, imp: Importacao, ops: Operacao[], rocs: Res
 
     if (erros.length) {
       await c.query(
-        `insert into public.erros_validacao (escritorio_id, empresa_id, importacao_id, documento_id, item_numero, codigo, campo, mensagem)
-         select $1, $2, $3, $4, x.item_numero, x.codigo, x.campo, x.mensagem
+        `insert into public.erros_validacao (escritorio_id, empresa_id, importacao_id, documento_id, item_numero, codigo, campo, mensagem, arquivo_origem)
+         select $1, $2, $3, $4, x.item_numero, x.codigo, x.campo, x.mensagem, $6
          from jsonb_to_recordset($5::jsonb) as x(item_numero int, codigo text, campo text, mensagem text)`,
-        [imp.escritorio_id, imp.empresa_id, imp.id, docId, JSON.stringify(erros)],
+        [imp.escritorio_id, imp.empresa_id, imp.id, docId, JSON.stringify(erros), arquivo],
       );
     }
   }
 
+  await inserirOcorrencias(c, imp, ocorrencias);
   await c.query(
     `update public.importacoes set status = 'concluido', qtd_docs = $2, qtd_erros = $3, concluido_em = now(),
-       mensagem_erro = null where id = $1`,
-    [imp.id, ops.length, itensErro],
+       mensagem_erro = $4 where id = $1`,
+    [imp.id, notas.length, itensErro + contaComoErro(ocorrencias),
+     contaComoErro(ocorrencias) ? `${contaComoErro(ocorrencias)} nota(s) com erro não foram calculadas` : null],
   );
 
   for (const [comp, qtd] of competencias) {
@@ -271,7 +364,7 @@ async function gravar(c: PoolClient, imp: Importacao, ops: Operacao[], rocs: Res
       [imp.escritorio_id, comp, qtd],
     );
   }
-  return { docs: ops.length, itens: itensTotal, erros: itensErro };
+  return { docs: notas.length, itens: itensTotal, erros: itensErro };
 }
 
 /** Versão da calculadora/base (gravada em cada resultado). Atualizada no início do worker. */

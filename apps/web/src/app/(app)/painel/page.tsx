@@ -22,7 +22,7 @@ export default async function PainelPage() {
   const { supabase } = ctx;
 
   const [totais, divergencias, uso, ultimas] = await Promise.all([
-    supabase.from("vw_totais_mensais").select("*").eq("empresa_id", ctx.empresa.id).eq("competencia", comp).maybeSingle(),
+    supabase.from("vw_totais_mensais").select("*").eq("empresa_id", ctx.empresa.id).eq("competencia", comp),
     supabase.from("vw_divergencias").select("item_id", { count: "exact", head: true })
       .eq("empresa_id", ctx.empresa.id).eq("competencia", comp).or("diferenca.gt.0.01,diferenca.lt.-0.01"),
     supabase.from("uso_mensal").select("qtd_notas").eq("escritorio_id", ctx.escritorio.id).eq("competencia", comp).maybeSingle(),
@@ -30,17 +30,19 @@ export default async function PainelPage() {
       .eq("empresa_id", ctx.empresa.id).order("criado_em", { ascending: false }).limit(5),
   ]);
 
-  const t = totais.data;
-  const qtdItens = t?.qtd_itens ?? 0;
-  const qtdCalculados = t?.qtd_calculados ?? 0;
+  // Emitidas = débito; recebidas = crédito (o IS não gera crédito)
+  const debito = totais.data?.find((x) => x.papel === "emitida");
+  const credito = totais.data?.find((x) => x.papel === "recebida");
+  const qtdItens = (totais.data ?? []).reduce((s, x) => s + (x.qtd_itens ?? 0), 0);
+  const qtdCalculados = (totais.data ?? []).reduce((s, x) => s + (x.qtd_calculados ?? 0), 0);
   const notas = uso.data?.qtd_notas ?? 0;
   const pctUso = Math.min(100, Math.round((notas / LIMITE_MVP) * 100));
 
   const cartoes = [
-    { rotulo: "CBS", valor: t?.cbs_total },
-    { rotulo: "IBS estadual", valor: t?.ibs_uf_total },
-    { rotulo: "IBS municipal", valor: t?.ibs_mun_total },
-    { rotulo: "Imposto Seletivo", valor: t?.is_total },
+    { rotulo: "CBS", debito: debito?.cbs_total, credito: credito?.cbs_total },
+    { rotulo: "IBS estadual", debito: debito?.ibs_uf_total, credito: credito?.ibs_uf_total },
+    { rotulo: "IBS municipal", debito: debito?.ibs_mun_total, credito: credito?.ibs_mun_total },
+    { rotulo: "Imposto Seletivo", debito: debito?.is_total, credito: undefined },
   ];
 
   return (
@@ -55,8 +57,15 @@ export default async function PainelPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cartoes.map((c) => (
           <Card key={c.rotulo}>
-            <CardHeader className="pb-2"><CardDescription>{c.rotulo}</CardDescription></CardHeader>
-            <CardContent><div className="text-2xl font-semibold tabular-nums">{formatarMoeda(c.valor)}</div></CardContent>
+            <CardHeader className="pb-2"><CardDescription>{c.rotulo} · débito (notas emitidas)</CardDescription></CardHeader>
+            <CardContent>
+              <div className="text-2xl font-semibold tabular-nums">{formatarMoeda(c.debito)}</div>
+              {c.rotulo !== "Imposto Seletivo" && (
+                <p className="mt-1 text-sm text-muted-foreground tabular-nums">
+                  Crédito (notas recebidas): {formatarMoeda(c.credito)}
+                </p>
+              )}
+            </CardContent>
           </Card>
         ))}
       </div>

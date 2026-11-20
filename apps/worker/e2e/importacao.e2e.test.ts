@@ -22,7 +22,7 @@ const sb = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process
 // Exemplo oficial (docs/exemplos.md) + campos do ApuraRTC. id único para não repetir o hash entre execuções.
 const exemplo = JSON.parse(readFileSync(new URL("../../../infra/calculadora/exemplos/operacao.json", import.meta.url), "utf8"));
 exemplo.id = randomUUID().replace(/-/g, "");
-exemplo.chaveAcesso = "43270311222333000181550010000000011000000019";
+exemplo.chaveAcesso = "4327031122233300018155001" + String(Date.now()).slice(-9).padStart(9, "0") + "1" + "00000000" + "9";
 exemplo.itens[0].informado = { cbs: 1.0 };    // calculado 0,00 → divergência de −1,00
 exemplo.itens[2].informado = { cbs: 42.24 };  // igual ao calculado → diferença 0
 const conteudo = JSON.stringify(exemplo);

@@ -77,6 +77,35 @@ export async function calcular(baseUrl: string, operacao: Record<string, unknown
   return json;
 }
 
+/** Validador XSD oficial (POST /xml/validate?subtipo=nota). Recebe a <NFe> isolada. */
+export async function validarXmlOficial(
+  baseUrl: string,
+  tipo: "nfe" | "nfce",
+  xmlNFe: string,
+): Promise<{ ok: true } | { ok: false; mensagem: string }> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/calculadora/xml/validate?tipo=${tipo}&subtipo=nota`, {
+      method: "POST",
+      headers: { "Content-Type": "application/xml" },
+      body: `<?xml version="1.0" encoding="utf-8"?>${xmlNFe}`,
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch (e) {
+    throw new ErroCalculadora(`calculadora indisponível: ${(e as Error).message}`, true);
+  }
+  const texto = await res.text();
+  if (res.ok && texto.trim() === "true") return { ok: true };
+  if (res.status >= 500) throw new ErroCalculadora(`validador XML HTTP ${res.status}`, true);
+  let mensagem = texto.slice(0, 500);
+  try {
+    mensagem = (JSON.parse(texto) as { detail?: string }).detail ?? mensagem;
+  } catch {
+    /* texto puro */
+  }
+  return { ok: false, mensagem: mensagem.replace(/^Erro na validação do XML:\s*/, "") };
+}
+
 const num = (v: unknown): number | null => (v === undefined || v === null || v === "" ? null : Number(v));
 const aliquota = (g: Grupo | undefined, campo: string): number | null =>
   g ? num(g.gRed?.pAliqEfet ?? g[campo]) : null; // alíquota efetiva quando há redução

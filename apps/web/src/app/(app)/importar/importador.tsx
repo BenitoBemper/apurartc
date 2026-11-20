@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { FileJson, UploadCloud } from "lucide-react";
+import { FileArchive, FileCode, FileJson, UploadCloud } from "lucide-react";
 import { caminhoArquivo, BUCKET_ARQUIVOS, type Tabela } from "@apurartc/db";
 import { criarClienteBrowser } from "@/lib/supabase/client";
 import type { EmpresaResumo } from "@/lib/contexto";
@@ -18,6 +18,18 @@ type Linha = Pick<
 >;
 
 const TAMANHO_MAX = 50 * 1024 * 1024;
+
+function tipoArquivo(nome: string) {
+  if (/\.json$/i.test(nome)) return { formato: "json" as const, contentType: "application/json" };
+  if (/\.xml$/i.test(nome)) return { formato: "xml_nfe" as const, contentType: "application/xml" };
+  if (/\.zip$/i.test(nome)) return { formato: "zip" as const, contentType: "application/zip" };
+  return null;
+}
+
+function IconeArquivo({ formato }: { formato: string }) {
+  const Icone = formato === "zip" ? FileArchive : formato === "json" ? FileJson : FileCode;
+  return <Icone className="size-4 shrink-0" />;
+}
 
 async function sha256(arquivo: File): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", await arquivo.arrayBuffer());
@@ -70,8 +82,9 @@ export function Importador(props: {
 
   async function enviar(arquivos: FileList | File[]) {
     for (const arq of Array.from(arquivos)) {
-      if (!/\.json$/i.test(arq.name)) {
-        toast.error(`${arq.name}: só arquivos .json nesta versão (XML NF-e vem na próxima etapa).`);
+      const tipo = tipoArquivo(arq.name);
+      if (!tipo) {
+        toast.error(`${arq.name}: formato não aceito (use .json, .xml ou .zip).`);
         continue;
       }
       if (arq.size > TAMANHO_MAX) {
@@ -92,12 +105,12 @@ export function Importador(props: {
         }
         const nome = `${crypto.randomUUID()}__${arq.name.replace(/[^\w.\-]+/g, "_")}`;
         const path = caminhoArquivo(escritorioId, empresa.id, "importacoes", nome);
-        const up = await supabase.storage.from(BUCKET_ARQUIVOS).upload(path, arq, { contentType: "application/json" });
+        const up = await supabase.storage.from(BUCKET_ARQUIVOS).upload(path, arq, { contentType: tipo.contentType });
         if (up.error) throw new Error(up.error.message);
 
         const { data, error } = await supabase
           .from("importacoes")
-          .insert({ empresa_id: empresa.id, escritorio_id: escritorioId, formato: "json", arquivo_path: path, hash_sha256: hash })
+          .insert({ empresa_id: empresa.id, escritorio_id: escritorioId, formato: tipo.formato, arquivo_path: path, hash_sha256: hash })
           .select("id, formato, arquivo_path, status, qtd_docs, qtd_erros, mensagem_erro, criado_em")
           .single();
         if (error) {
@@ -120,10 +133,10 @@ export function Importador(props: {
       {podeImportar && (
         <Card>
           <CardHeader>
-            <CardTitle>Arquivos JSON</CardTitle>
+            <CardTitle>Arquivos</CardTitle>
             <CardDescription>
-              Destino: <strong>{empresa.razao_social}</strong> ({formatarCnpj(empresa.cnpj)}). Layout: OperacaoInput da
-              calculadora (uma nota ou uma lista), com os campos opcionais chaveAcesso, numero, serie e informado por item.
+              Destino: <strong>{empresa.razao_social}</strong> ({formatarCnpj(empresa.cnpj)}). XML de NF-e/NFC-e
+              (emitidas ou recebidas pela empresa), ZIP com vários XMLs ou JSON no layout da calculadora.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -142,9 +155,9 @@ export function Importador(props: {
               <span className="font-medium text-foreground">
                 {enviando ? `Enviando ${enviando} arquivo(s)…` : "Arraste arquivos aqui ou clique para escolher"}
               </span>
-              <span className="text-xs">.json · até 50 MB · até 5 mil notas por mês no plano gratuito</span>
+              <span className="text-xs">.xml · .zip · .json · até 50 MB · até 5 mil notas por mês no plano gratuito</span>
             </button>
-            <input ref={input} type="file" accept=".json,application/json" multiple hidden
+            <input ref={input} type="file" accept=".json,.xml,.zip,application/json,application/xml,text/xml,application/zip" multiple hidden
               onChange={(e) => { if (e.target.files) void enviar(e.target.files); e.target.value = ""; }} />
           </CardContent>
         </Card>
@@ -170,7 +183,7 @@ export function Importador(props: {
                   return (
                     <TableRow key={l.id}>
                       <TableCell className="max-w-72">
-                        <div className="flex items-center gap-2 truncate"><FileJson className="size-4 shrink-0" />{nomeOriginal(l.arquivo_path)}</div>
+                        <div className="flex items-center gap-2 truncate"><IconeArquivo formato={l.formato} />{nomeOriginal(l.arquivo_path)}</div>
                         {l.status === "erro" && l.mensagem_erro && (
                           <div className="mt-1 whitespace-normal text-xs text-destructive">{l.mensagem_erro}</div>
                         )}

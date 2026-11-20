@@ -53,14 +53,14 @@ isOneToOne: false
                   ]
                 },"documentos": {
                   Row: {
-                    "chave_acesso": string | null,"competencia": string | null,"criado_em": string,"dh_emissao": string,"dh_fato_gerador": string | null,"empresa_id": string,"escritorio_id": string,"id": string,"importacao_id": string,"municipio": number | null,"numero": string | null,"serie": string | null,"status": string,"tipo_dfe": string,"uf": string | null
+                    "arquivo_origem": string | null,"chave_acesso": string | null,"competencia": string | null,"criado_em": string,"dh_emissao": string,"dh_fato_gerador": string | null,"empresa_id": string,"escritorio_id": string,"id": string,"importacao_id": string,"municipio": number | null,"numero": string | null,"papel": Database["public"]['Enums']["papel_nota"],"serie": string | null,"status": string,"tipo_dfe": string,"uf": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "chave_acesso"?: string | null,"competencia"?: never,"criado_em"?: string,"dh_emissao": string,"dh_fato_gerador"?: string | null,"empresa_id": string,"escritorio_id": string,"id"?: string,"importacao_id": string,"municipio"?: number | null,"numero"?: string | null,"serie"?: string | null,"status"?: string,"tipo_dfe": string,"uf"?: string | null
+                    "arquivo_origem"?: string | null,"chave_acesso"?: string | null,"competencia"?: never,"criado_em"?: string,"dh_emissao": string,"dh_fato_gerador"?: string | null,"empresa_id": string,"escritorio_id": string,"id"?: string,"importacao_id": string,"municipio"?: number | null,"numero"?: string | null,"papel"?: Database["public"]['Enums']["papel_nota"],"serie"?: string | null,"status"?: string,"tipo_dfe": string,"uf"?: string | null
                   }
                   Update: {
-                    "chave_acesso"?: string | null,"competencia"?: never,"criado_em"?: string,"dh_emissao"?: string,"dh_fato_gerador"?: string | null,"empresa_id"?: string,"escritorio_id"?: string,"id"?: string,"importacao_id"?: string,"municipio"?: number | null,"numero"?: string | null,"serie"?: string | null,"status"?: string,"tipo_dfe"?: string,"uf"?: string | null
+                    "arquivo_origem"?: string | null,"chave_acesso"?: string | null,"competencia"?: never,"criado_em"?: string,"dh_emissao"?: string,"dh_fato_gerador"?: string | null,"empresa_id"?: string,"escritorio_id"?: string,"id"?: string,"importacao_id"?: string,"municipio"?: number | null,"numero"?: string | null,"papel"?: Database["public"]['Enums']["papel_nota"],"serie"?: string | null,"status"?: string,"tipo_dfe"?: string,"uf"?: string | null
                   }
                   Relationships: [
                     {
@@ -93,14 +93,14 @@ isOneToOne: false
                   ]
                 },"erros_validacao": {
                   Row: {
-                    "campo": string | null,"codigo": string,"criado_em": string,"documento_id": string | null,"empresa_id": string,"escritorio_id": string,"id": string,"importacao_id": string,"item_numero": number | null,"mensagem": string
+                    "arquivo_origem": string | null,"campo": string | null,"codigo": string,"criado_em": string,"documento_id": string | null,"empresa_id": string,"escritorio_id": string,"id": string,"importacao_id": string,"item_numero": number | null,"mensagem": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "campo"?: string | null,"codigo": string,"criado_em"?: string,"documento_id"?: string | null,"empresa_id": string,"escritorio_id": string,"id"?: string,"importacao_id": string,"item_numero"?: number | null,"mensagem": string
+                    "arquivo_origem"?: string | null,"campo"?: string | null,"codigo": string,"criado_em"?: string,"documento_id"?: string | null,"empresa_id": string,"escritorio_id": string,"id"?: string,"importacao_id": string,"item_numero"?: number | null,"mensagem": string
                   }
                   Update: {
-                    "campo"?: string | null,"codigo"?: string,"criado_em"?: string,"documento_id"?: string | null,"empresa_id"?: string,"escritorio_id"?: string,"id"?: string,"importacao_id"?: string,"item_numero"?: number | null,"mensagem"?: string
+                    "arquivo_origem"?: string | null,"campo"?: string | null,"codigo"?: string,"criado_em"?: string,"documento_id"?: string | null,"empresa_id"?: string,"escritorio_id"?: string,"id"?: string,"importacao_id"?: string,"item_numero"?: number | null,"mensagem"?: string
                   }
                   Relationships: [
                     {
@@ -274,7 +274,7 @@ isOneToOne: false
           Views: {
             "vw_divergencias": {
                   Row: {
-                    "calculado": number | null,"chave_acesso": string | null,"competencia": string,"diferenca": number | null,"documento_id": string,"empresa_id": string,"escritorio_id": string,"estado_item": Database["public"]['Enums']["estado_item"],"informado": number | null,"item_id": string,"item_numero": number,"tributo": string | null
+                    "calculado": number | null,"cclasstrib": string | null,"chave_acesso": string | null,"competencia": string,"diferenca": number | null,"documento_id": string,"documento_numero": string | null,"empresa_id": string,"escritorio_id": string,"estado_item": Database["public"]['Enums']["estado_item"],"importacao_id": string,"informado": number | null,"item_id": string,"item_numero": number,"nbs": string | null,"ncm": string | null,"papel": Database["public"]['Enums']["papel_nota"],"tributo": string | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -282,7 +282,7 @@ isOneToOne: false
                   ]
                 },"vw_totais_mensais": {
                   Row: {
-                    "cbs_total": number | null,"competencia": string,"empresa_id": string,"escritorio_id": string,"ibs_mun_total": number | null,"ibs_uf_total": number | null,"is_total": number | null,"qtd_calculados": number | null,"qtd_itens": number | null
+                    "cbs_total": number | null,"competencia": string,"empresa_id": string,"escritorio_id": string,"ibs_mun_total": number | null,"ibs_uf_total": number | null,"is_total": number | null,"papel": Database["public"]['Enums']["papel_nota"],"qtd_calculados": number | null,"qtd_itens": number | null
                   }
                   ComputedFields: never
                   Relationships: [
@@ -296,7 +296,7 @@ isOneToOne: false
                            }
           }
           Enums: {
-            "estado_item": "CALCULADO"|"CALCULO_SIMULADO"|"INCONSISTENCIA_ENTRADA"|"NAO_IMPLEMENTADO"|"FALHA_TECNICA","formato_importacao": "json"|"xml_nfe"|"xml_nfse"|"txt","origem_importacao": "upload"|"api","papel_membro": "admin"|"operador"|"leitor","status_importacao": "recebido"|"validando"|"processando"|"concluido"|"erro"
+            "estado_item": "CALCULADO"|"CALCULO_SIMULADO"|"INCONSISTENCIA_ENTRADA"|"NAO_IMPLEMENTADO"|"FALHA_TECNICA","formato_importacao": "json"|"xml_nfe"|"xml_nfse"|"txt"|"zip","origem_importacao": "upload"|"api","papel_membro": "admin"|"operador"|"leitor","papel_nota": "emitida"|"recebida","status_importacao": "recebido"|"validando"|"processando"|"concluido"|"erro"
           }
           CompositeTypes: {
             [_ in never]: never
@@ -412,7 +412,7 @@ export type CompositeTypes<
 export const Constants = {
   "public": {
           Enums: {
-            "estado_item": ["CALCULADO", "CALCULO_SIMULADO", "INCONSISTENCIA_ENTRADA", "NAO_IMPLEMENTADO", "FALHA_TECNICA"],"formato_importacao": ["json", "xml_nfe", "xml_nfse", "txt"],"origem_importacao": ["upload", "api"],"papel_membro": ["admin", "operador", "leitor"],"status_importacao": ["recebido", "validando", "processando", "concluido", "erro"]
+            "estado_item": ["CALCULADO", "CALCULO_SIMULADO", "INCONSISTENCIA_ENTRADA", "NAO_IMPLEMENTADO", "FALHA_TECNICA"],"formato_importacao": ["json", "xml_nfe", "xml_nfse", "txt", "zip"],"origem_importacao": ["upload", "api"],"papel_membro": ["admin", "operador", "leitor"],"papel_nota": ["emitida", "recebida"],"status_importacao": ["recebido", "validando", "processando", "concluido", "erro"]
           }
         }
 } as const

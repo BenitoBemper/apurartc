@@ -15,6 +15,9 @@ const VT_SEGUNDOS = 600; // tempo de invisibilidade da mensagem durante o proces
 const LOTE = 3;
 
 const pool = new pg.Pool({ connectionString: env("DATABASE_URL"), max: 5 });
+// Conexão ociosa derrubada pelo banco (reinício, failover): sem este handler o processo inteiro cai.
+// O pool descarta o cliente e abre outro no próximo ciclo.
+pool.on("error", (e) => console.error("[worker] conexão com o banco perdida (reconecta no próximo ciclo):", e.message));
 const storage = createClient(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), {
   auth: { persistSession: false, autoRefreshToken: false },
 });
