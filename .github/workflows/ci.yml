@@ -1,0 +1,39 @@
+# CI: tipos, lint e testes unitários a cada push/PR (testes de banco e e2e rodam localmente).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Tipos (web)
+        run: npx tsc --noEmit -p apps/web
+      - name: Tipos (worker)
+        run: npx tsc -p apps/worker/tsconfig.json
+      - name: Lint (web)
+        run: npx eslint src
+        working-directory: apps/web
+      - name: Testes (web)
+        run: npm test -w apps/web
+      - name: Testes (worker)
+        run: npm test -w apps/worker
+      - name: Build (web)
+        run: npm run build -w apps/web
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci

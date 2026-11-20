@@ -1,0 +1,35 @@
+# Produção (servidor Oracle Cloud): calculadora oficial + worker.
+# A calculadora NÃO publica porta: só o worker fala com ela, pela rede interna do Docker.
+# Uso: docker compose -f infra/producao/docker-compose.yml --env-file infra/producao/.env.producao up -d --build
+name: apurartc
+
+services:
+  calculadora:
+    build:
+      context: ../calculadora
+      additional_contexts:
+        # Repositório oficial da Receita, ao lado do apurartc/ (clonado na tag fixa pelo instalar-servidor.sh)
+        calculadora: ${CALCULADORA_SRC:-../../../calculadora-rtc-regime-regular}
+    image: apurartc/calculadora:${CALCULADORA_VERSAO:-1.6.1}
+    restart: unless-stopped
+    expose: ["8080", "9101"]
+    deploy:
+      resources:
+        limits: { memory: 2g }
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/worker/Dockerfile
+    image: apurartc/worker:latest
+    restart: unless-stopped
+    depends_on:
+      calculadora: { condition: service_healthy }
+    env_file: .env.producao
+    environment:
+      CALCULADORA_URL: http://calculadora:8080/api
+    deploy:
+      resources:
+        limits: { memory: 1g }
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "5" } }
