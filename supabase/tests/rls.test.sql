@@ -2,7 +2,7 @@
 -- Usa os usuários/escritórios do seed.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(25);
+select plan(26);
 
 -- Isola dos dados criados pelo app e pelo e2e (o rollback no fim desfaz tudo).
 delete from public.importacoes;
@@ -50,6 +50,16 @@ select is((select diferenca from public.vw_divergencias where tributo = 'CBS'), 
   'vw_divergencias: calculado − informado');
 select is((select count(*)::int from public.vw_divergencias where diferenca is not null), 1,
   'vw_divergencias: sem valor informado não há diferença');
+reset role;
+update public.resultados_calculo set estado_item = 'INCONSISTENCIA_ENTRADA', cbs_valor = null
+  where item_id = '30000000-0000-0000-0000-0000000000a1';
+set local role authenticated;
+select is((select count(*)::int from public.vw_divergencias where diferenca is not null), 0,
+  'vw_divergencias: item não calculado é erro, não divergência');
+reset role;
+update public.resultados_calculo set estado_item = 'CALCULO_SIMULADO', cbs_valor = 8.80
+  where item_id = '30000000-0000-0000-0000-0000000000a1';
+set local role authenticated;
 select throws_ok($$select count(*) from particoes.itens_2027_03$$, '42501', null,
   'partição não é acessível diretamente');
 select lives_ok(

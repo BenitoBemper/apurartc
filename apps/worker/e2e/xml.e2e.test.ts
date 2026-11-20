@@ -34,7 +34,7 @@ const zip = zipSync({
 async function importar(nome: string, dados: Uint8Array, formato: "zip" | "xml_nfe") {
   const path = `${ESC_A}/${EMP_A1}/importacoes/${randomUUID()}__${nome}`;
   const tipo = formato === "zip" ? "application/zip" : "application/xml";
-  const up = await sb.storage.from("arquivos").upload(path, new Blob([dados], { type: tipo }), { contentType: tipo });
+  const up = await sb.storage.from("arquivos").upload(path, new Blob([dados as Uint8Array<ArrayBuffer>], { type: tipo }), { contentType: tipo });
   if (up.error) throw up.error;
   const hash = createHash("sha256").update(dados).digest("hex");
   const { data, error } = await sb.from("importacoes")

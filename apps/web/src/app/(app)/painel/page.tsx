@@ -106,7 +106,7 @@ export default async function PainelPage() {
           {ultimas.data?.length ? (
             ultimas.data.map((i) => (
               <div key={i.id} className="flex items-center justify-between gap-4 text-sm">
-                <span className="truncate">{nomeOriginal(i.arquivo_path)}</span>
+                <Link href={`/importacoes/${i.id}`} className="truncate hover:underline">{nomeOriginal(i.arquivo_path)}</Link>
                 <span className="flex shrink-0 items-center gap-3 text-muted-foreground">
                   {i.qtd_docs} nota(s) · {new Date(i.criado_em).toLocaleDateString("pt-BR")}
                   <Badge variant={statusImportacao(i.status).variante}>{statusImportacao(i.status).rotulo}</Badge>

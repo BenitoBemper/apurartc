@@ -21,6 +21,16 @@ O arquivo pode conter **uma operação (nota)** ou **uma lista** de operações 
 | operação | `chaveAcesso` (44 dígitos), `numero`, `serie`, `tipoDfe` | identificação da nota |
 | item | `informado: { cbs, ibsUf, ibsMun, is }` | valores do ERP → divergência = calculado − informado |
 
+## XML de NF-e/NFC-e e ZIP
+- Aceita `NFe`, `nfeProc` (nota autorizada) e `enviNFe` (lote); `.zip` com vários `.xml` (até 5.000).
+- **Papel** pelo CNPJ da empresa selecionada: emitente = **emitida (débito)**; destinatário = **recebida (crédito)**; outro CNPJ = nota rejeitada.
+- Cada nota passa pelo validador XSD oficial da calculadora (`/xml/validate?subtipo=nota`).
+- Conversão: `dhEmi` → `dhFatoGerador`; `cMunFGIBS`/`cMunFG` → município (UF pelo código IBGE); por item: `NCM`, `qCom`, `uCom`,
+  `IBSCBS/CST`, `cClassTrib`, `gIBSCBS/vBC` (sem IS) ou grupo `IS` (com IS); alíquotas `pCBS`, `pIBSUF`, `pIBSMun`, `pIS` só a partir de 2027.
+- Valores destacados (`vCBS`, `vIBSUF`, `vIBSMun`, `vIS`) viram `informado` → divergência.
+- Eventos (`procEventoNFe`, cancelamento…) são ignorados com aviso. Nota já importada (mesma chave, empresa e papel) é ignorada com aviso.
+- No XML/ZIP cada nota é independente: notas com erro são registradas e as demais são calculadas.
+
 ## Processamento
 1. Layout inválido → importação com **Erro** e lista de erros (`#/campo` em JSON Pointer; em lista, `#/<índice>/campo`).
 2. A calculadora rejeitou a operação (HTTP 422) → **Erro** com os códigos dela (ex.: `VAL-001`).

@@ -274,7 +274,7 @@ isOneToOne: false
           Views: {
             "vw_divergencias": {
                   Row: {
-                    "calculado": number | null,"cclasstrib": string | null,"chave_acesso": string | null,"competencia": string,"diferenca": number | null,"documento_id": string,"documento_numero": string | null,"empresa_id": string,"escritorio_id": string,"estado_item": Database["public"]['Enums']["estado_item"],"importacao_id": string,"informado": number | null,"item_id": string,"item_numero": number,"nbs": string | null,"ncm": string | null,"papel": Database["public"]['Enums']["papel_nota"],"tributo": string | null
+                    "calculado": number | null,"cclasstrib": string | null,"chave_acesso": string | null,"competencia": string,"diferenca": number | null,"diferenca_abs": number | null,"documento_id": string,"documento_numero": string | null,"empresa_id": string,"escritorio_id": string,"estado_item": Database["public"]['Enums']["estado_item"],"importacao_id": string,"informado": number | null,"item_id": string,"item_numero": number,"nbs": string | null,"ncm": string | null,"papel": Database["public"]['Enums']["papel_nota"],"tributo": string | null
                   }
                   ComputedFields: never
                   Relationships: [

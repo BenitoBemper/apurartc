@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { FileArchive, FileCode, FileJson, UploadCloud } from "lucide-react";
 import { caminhoArquivo, BUCKET_ARQUIVOS, type Tabela } from "@apurartc/db";
@@ -183,7 +184,7 @@ export function Importador(props: {
                   return (
                     <TableRow key={l.id}>
                       <TableCell className="max-w-72">
-                        <div className="flex items-center gap-2 truncate"><IconeArquivo formato={l.formato} />{nomeOriginal(l.arquivo_path)}</div>
+                        <Link href={`/importacoes/${l.id}`} className="flex items-center gap-2 truncate hover:underline"><IconeArquivo formato={l.formato} />{nomeOriginal(l.arquivo_path)}</Link>
                         {l.status === "erro" && l.mensagem_erro && (
                           <div className="mt-1 whitespace-normal text-xs text-destructive">{l.mensagem_erro}</div>
                         )}

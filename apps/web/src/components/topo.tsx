@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const MENU = [
   { href: "/painel", rotulo: "Painel" },
   { href: "/importar", rotulo: "Importar" },
+  { href: "/divergencias", rotulo: "Divergências" },
   { href: "/empresas", rotulo: "Empresas" },
 ];
 
