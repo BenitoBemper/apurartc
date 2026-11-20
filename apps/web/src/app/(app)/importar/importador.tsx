@@ -48,7 +48,7 @@ export function Importador(props: {
   const [arrastando, setArrastando] = useState(false);
   const [enviando, setEnviando] = useState(0);
   const input = useRef<HTMLInputElement>(null);
-  const supabase = useRef(criarClienteBrowser()).current;
+  const [supabase] = useState(() => criarClienteBrowser());
 
   // Status em tempo real (Realtime respeita o RLS)
   useEffect(() => {

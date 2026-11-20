@@ -26,7 +26,7 @@ export const itemSchema = z
 
 export const operacaoSchema = z
   .object({
-    id: z.string({ required_error: "id da operação é obrigatório (exigido pela calculadora)" }).min(1).max(100),
+    id: z.string({ error: (i) => (i.input === undefined ? "id da operação é obrigatório (exigido pela calculadora)" : "id deve ser texto") }).min(1).max(100),
     versao: z.string().default("1.0.0"), // versão do layout OperacaoInput (obrigatória na calculadora)
     dhFatoGerador: z.string().datetime({ offset: true, message: "dhFatoGerador deve ser ISO 8601 com fuso (ex.: 2027-03-10T10:00:00-03:00)" }),
     municipio: z.number().int().min(1000000).max(9999999),
