@@ -5,6 +5,9 @@ const ROTAS_PUBLICAS = ["/login", "/auth"];
 
 // Renova a sessão do Supabase a cada requisição e protege as rotas do app.
 export async function middleware(request: NextRequest) {
+  // API pública: autenticação própria (chave de API), sem sessão nem redirecionamento
+  if (request.nextUrl.pathname.startsWith("/api/v1")) return NextResponse.next();
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(

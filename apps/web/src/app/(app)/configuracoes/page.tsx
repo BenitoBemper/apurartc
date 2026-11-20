@@ -3,7 +3,7 @@ import { clienteAdmin } from "@/lib/supabase/admin";
 import { formatarCompetencia } from "@/lib/formatos";
 import { mesesAte } from "@/lib/relatorio";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ConviteForm, MembroLinha } from "./membros";
 import { ChavesApi } from "./chaves";
 

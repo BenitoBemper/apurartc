@@ -23,7 +23,15 @@ npm run dev:web          # app em http://localhost:3000
 ```
 Usuários de teste: veja `supabase/seed.sql`. Os arquivos `.env` locais seguem os `.env.example` (valores de `npx supabase status`).
 
-Testes: `npm test` (unitários + pgTAP) · `npm run test:e2e` (com o worker rodando).
+Testes: `npm test` (unitários + pgTAP) · `npm run test -w apps/web` · `npm run test:e2e` (com web, worker e calculadora rodando).
+
+## API pública
+`/api/v1` com chave criada em Configurações → Chaves da API (`Authorization: Bearer artc_…`, 60 req/min).
+Documentação interativa: http://localhost:3000/api/v1/docs · especificação: `/api/v1/openapi.json`.
+
+```bash
+curl -H "Authorization: Bearer $CHAVE" -F cnpj=12345678000195 -F arquivo=@notas.zip http://localhost:3000/api/v1/importacoes
+```
 Layout de importação: [docs/layout-json.md](docs/layout-json.md).
 
 ## Calculadora local

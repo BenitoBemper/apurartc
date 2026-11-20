@@ -31,6 +31,26 @@ isOneToOne: false
       referencedColumns: ["id"]
     }
                   ]
+                },"api_uso": {
+                  Row: {
+                    "chave_id": string,"contagem": number,"minuto": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "chave_id": string,"contagem"?: number,"minuto": string
+                  }
+                  Update: {
+                    "chave_id"?: string,"contagem"?: number,"minuto"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "api_uso_chave_id_fkey"
+      columns: ["chave_id"]
+isOneToOne: false
+      referencedRelation: "api_chaves"
+      referencedColumns: ["id"]
+    }
+                  ]
                 },"auditoria": {
                   Row: {
                     "acao": string,"criado_em": string,"detalhes": Json | null,"entidade": string,"entidade_id": string | null,"escritorio_id": string | null,"id": number,"ip": unknown,"user_id": string | null
@@ -291,7 +311,10 @@ isOneToOne: false
                 }
           }
           Functions: {
-            "criar_escritorio":
+            "api_consumir_cota":
+{ Args: { "p_chave": string,"p_limite": number }; Returns: boolean
+                           },
+"criar_escritorio":
 { Args: { "p_documento"?: string,"p_nome": string }; Returns: string
                            },
 "usuario_por_email":
