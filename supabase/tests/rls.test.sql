@@ -2,7 +2,7 @@
 -- Usa os usuários/escritórios do seed.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(23);
+select plan(24);
 
 -- ---------- Fixtures (como postgres, dono das tabelas) ----------
 insert into public.importacoes (id, empresa_id, formato, arquivo_path, hash_sha256) values
@@ -46,6 +46,10 @@ select is((select diferenca from public.vw_divergencias where tributo = 'CBS'), 
   'vw_divergencias: calculado − informado');
 select throws_ok($$select count(*) from particoes.itens_2027_03$$, '42501', null,
   'partição não é acessível diretamente');
+select lives_ok(
+  $$insert into public.empresas (escritorio_id, cnpj, razao_social)
+    values ('e0000000-0000-0000-0000-00000000000a', '11222333000181', 'Nova A3') returning id$$,
+  'admin.a cadastra empresa com RETURNING (bug da Etapa 3)');
 
 -- ---------- operador.a: restrito à Empresa A1 ----------
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-000000000002","role":"authenticated"}';
@@ -62,7 +66,7 @@ select throws_ok(
 
 -- ---------- leitor.a: só consulta ----------
 set local request.jwt.claims = '{"sub":"a0000000-0000-0000-0000-000000000003","role":"authenticated"}';
-select is((select count(*)::int from public.empresas), 2, 'leitor.a vê as 2 empresas');
+select is((select count(*)::int from public.empresas), 3, 'leitor.a vê as 3 empresas (inclui a criada no teste)');
 select throws_ok(
   $$insert into public.importacoes (empresa_id, formato, arquivo_path, hash_sha256)
     values ('c0000000-0000-0000-0000-0000000000a1', 'json', 'x/lei.json', repeat('f', 64))$$,

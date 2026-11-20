@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Pacote do monorepo publicado como TypeScript.
+  transpilePackages: ["@apurartc/db"],
 };
 
 export default nextConfig;
