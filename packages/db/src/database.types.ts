@@ -280,6 +280,14 @@ isOneToOne: false
                   Relationships: [
                     
                   ]
+                },"vw_totais_mensais": {
+                  Row: {
+                    "cbs_total": number | null,"competencia": string,"empresa_id": string,"escritorio_id": string,"ibs_mun_total": number | null,"ibs_uf_total": number | null,"is_total": number | null,"qtd_calculados": number | null,"qtd_itens": number | null
+                  }
+                  ComputedFields: never
+                  Relationships: [
+                    
+                  ]
                 }
           }
           Functions: {

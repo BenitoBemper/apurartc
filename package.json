@@ -20,7 +20,9 @@
     "db:stop": "supabase stop",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:types": "supabase gen types typescript --schema public > packages/db/src/database.types.ts"
+    "db:types": "supabase gen types typescript --schema public > packages/db/src/database.types.ts",
+    "test": "npm run test -w apps/worker && npm run db:test",
+    "test:e2e": "npm run test:e2e -w apps/worker"
   },
   "engines": {
     "node": ">=22"

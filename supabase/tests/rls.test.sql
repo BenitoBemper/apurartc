@@ -2,7 +2,11 @@
 -- Usa os usuários/escritórios do seed.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(25);
+
+-- Isola dos dados criados pelo app e pelo e2e (o rollback no fim desfaz tudo).
+delete from public.importacoes;
+do $$ begin perform pgmq.purge_queue('importacoes'); end $$;
 
 -- ---------- Fixtures (como postgres, dono das tabelas) ----------
 insert into public.importacoes (id, empresa_id, formato, arquivo_path, hash_sha256) values
@@ -44,6 +48,8 @@ select is((select count(*)::int from public.importacoes), 2, 'admin.a vê só im
 select is((select count(*)::int from public.itens), 1, 'admin.a vê os itens do escritório A');
 select is((select diferenca from public.vw_divergencias where tributo = 'CBS'), -1.20::numeric,
   'vw_divergencias: calculado − informado');
+select is((select count(*)::int from public.vw_divergencias where diferenca is not null), 1,
+  'vw_divergencias: sem valor informado não há diferença');
 select throws_ok($$select count(*) from particoes.itens_2027_03$$, '42501', null,
   'partição não é acessível diretamente');
 select lives_ok(

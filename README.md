@@ -11,6 +11,21 @@ SaaS de validação, cálculo e apuração de IBS/CBS (Reforma Tributária do Co
 | `supabase/` | Migrations, RLS e configuração do Supabase |
 | `docs/` | Documentação do projeto |
 
+## Rodar tudo localmente
+Pré-requisitos: Docker Desktop, Node 22+. A pasta `calculadora-rtc-regime-regular/` precisa estar ao lado de `apurartc/`.
+
+```bash
+npm install
+npm run calc:up          # calculadora em :8080
+npm run db:start         # Supabase local (Studio em :54323)
+npm run dev:worker       # consome a fila de importações
+npm run dev:web          # app em http://localhost:3000
+```
+Usuários de teste: veja `supabase/seed.sql`. Os arquivos `.env` locais seguem os `.env.example` (valores de `npx supabase status`).
+
+Testes: `npm test` (unitários + pgTAP) · `npm run test:e2e` (com o worker rodando).
+Layout de importação: [docs/layout-json.md](docs/layout-json.md).
+
 ## Calculadora local
 Pré-requisito: Docker Desktop. A pasta `calculadora-rtc-regime-regular/` precisa estar ao lado de `apurartc/`.
 
