@@ -19,6 +19,7 @@ const MENU = [
   { href: "/painel", rotulo: "Painel" },
   { href: "/importar", rotulo: "Importar" },
   { href: "/divergencias", rotulo: "Divergências" },
+  { href: "/relatorio", rotulo: "Relatório" },
   { href: "/empresas", rotulo: "Empresas" },
 ];
 
