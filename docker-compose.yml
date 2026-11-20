@@ -1,0 +1,14 @@
+services:
+  calculadora:
+    build:
+      context: ./infra/calculadora
+      dockerfile: Dockerfile
+      additional_contexts:
+        # Código oficial da Receita, ao lado do monorepo (não é copiado nem alterado)
+        calculadora: ../calculadora-rtc-regime-regular
+    image: apurartc/calculadora:local
+    container_name: apurartc-calculadora
+    ports:
+      - "8080:8080"   # API  -> http://localhost:8080/api
+      - "9101:9101"   # health/metrics
+    restart: unless-stopped

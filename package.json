@@ -1,0 +1,22 @@
+{
+  "name": "apurartc",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ApuraRTC — SaaS de validação, cálculo e apuração de IBS/CBS",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev -w apps/web",
+    "dev:worker": "npm run dev -w apps/worker",
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "calc:up": "docker compose up -d --build calculadora",
+    "calc:down": "docker compose down",
+    "calc:logs": "docker compose logs -f calculadora",
+    "calc:test": "node infra/calculadora/testar.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
