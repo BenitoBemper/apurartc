@@ -29,4 +29,5 @@ console.log("totais:", got);
 const esperado = { vIS: "15.00", vBCIBSCBS: "1465.00", vIBS: "0.64", vCBS: "56.76" };
 const ok = Object.entries(esperado).every(([k, v]) => String(got[k]) === v);
 console.log(ok ? "OK: totais conferem com docs/exemplos.md" : `DIVERGENTE: esperado ${JSON.stringify(esperado)}`);
-process.exit(ok ? 0 : 1);
+// exitCode em vez de process.exit(): no Windows, sair com o fetch ainda aberto dispara uma assertion do libuv.
+process.exitCode = ok ? 0 : 1;
