@@ -293,6 +293,9 @@ isOneToOne: false
           Functions: {
             "criar_escritorio":
 { Args: { "p_documento"?: string,"p_nome": string }; Returns: string
+                           },
+"usuario_por_email":
+{ Args: { "p_email": string }; Returns: string
                            }
           }
           Enums: {

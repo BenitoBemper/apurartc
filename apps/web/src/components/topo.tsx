@@ -21,6 +21,7 @@ const MENU = [
   { href: "/divergencias", rotulo: "Divergências" },
   { href: "/relatorio", rotulo: "Relatório" },
   { href: "/empresas", rotulo: "Empresas" },
+  { href: "/configuracoes", rotulo: "Configurações" },
 ];
 
 const PAPEIS = { admin: "Administrador", operador: "Operador", leitor: "Leitor" } as const;

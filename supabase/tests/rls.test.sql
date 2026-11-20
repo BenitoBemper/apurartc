@@ -2,7 +2,7 @@
 -- Usa os usuários/escritórios do seed.sql.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(26);
+select plan(30);
 
 -- Isola dos dados criados pelo app e pelo e2e (o rollback no fim desfaz tudo).
 delete from public.importacoes;
@@ -96,6 +96,17 @@ select is((select count(*)::int from public.vw_divergencias), 0, 'admin.b não v
 select lives_ok($$update public.escritorios set nome = 'invadido' where id = 'e0000000-0000-0000-0000-00000000000a'$$,
   'update de admin.b no escritório A não dá erro (RLS filtra 0 linhas)');
 select isnt((select public.criar_escritorio('Escritório B2 (teste)')), null, 'criar_escritorio cria e torna admin');
+
+-- ---------- último admin ----------
+reset role;
+select throws_ok($$delete from public.membros where id = 'd0000000-0000-0000-0000-0000000000b1'$$,
+  'P0001', null, 'não remove o único admin do escritório');
+select throws_ok($$update public.membros set papel = 'leitor' where id = 'd0000000-0000-0000-0000-0000000000b1'$$,
+  'P0001', null, 'não rebaixa o único admin do escritório');
+select lives_ok($$update public.membros set papel = 'admin' where id = 'd0000000-0000-0000-0000-0000000000a2'$$,
+  'promove operador a admin');
+select lives_ok($$update public.membros set papel = 'leitor' where id = 'd0000000-0000-0000-0000-0000000000a1'$$,
+  'rebaixa admin quando há outro admin');
 
 -- ---------- conferência e anon ----------
 reset role;
